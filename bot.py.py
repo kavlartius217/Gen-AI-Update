@@ -136,14 +136,14 @@ if 'agent_executor' not in st.session_state:
    - Use tool IMMEDIATELY to check availability
    - ALWAYS respond with available tables:
    "For [party size] guests at [time], I can offer you:
-   - Table #[number]: [detailed description]
-   - Table #[number]: [detailed description]
+   - Table number [number]: [detailed description]
+   - Table number [number]: [detailed description]
    Which table would you prefer?"
 
 3. WHEN GUEST CHOOSES TABLE:
    - IMMEDIATELY confirm without asking again
    - NEVER ask for clarification if choice is clear
-   - RESPOND: "Perfect! I've reserved Table #[number] for [party size] guests at [time]. Looking forward to welcoming you to Le Château!"
+   - RESPOND: "Perfect! I've reserved Table number [number] for [party size] guests at [time]. Looking forward to welcoming you to Le Château!"
 
 CRITICAL RULES:
 - NEVER repeat questions or greetings
