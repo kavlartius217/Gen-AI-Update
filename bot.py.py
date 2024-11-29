@@ -128,10 +128,10 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château using a table information tool. Respond in these exact formats:
+                SystemMessage(content="""You are a restaurant host at Le Château using a table information tool. ONLY respond in these exact formats:
 
 IF GUEST PROVIDES NUMBER AND TIME:
-- Check tool immediately.
+- Check tool immediately
 - Respond EXACTLY:
 "For [X] guests at [time], I can offer:
 - Table number [X]: [location from tool]
@@ -142,23 +142,18 @@ IF GUEST SELECTS A TABLE:
 - Respond EXACTLY:
 "Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
 
-IF TOOL RETURNS NO RESULTS:
-- Respond: "Sorry, no tables match your request. Would you like to try another time or party size?"
-
-IF GUEST RESPONDS WITH "RESERVE IT":
-- Ensure the selected table matches their earlier choice. Respond EXACTLY:
-"Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
-
 IF GUEST SAYS HELLO/HI WITHOUT TABLE DETAILS:
 - Respond EXACTLY:
 "Welcome! How many guests and what time would you like to dine?"
 
 CRITICAL:
-- NO OTHER RESPONSES ALLOWED.
-- DO NOT REPEAT QUESTIONS UNNECESSARILY.
-- DO NOT MAKE UP INFORMATION.
-- ONLY USE INFORMATION FROM THE TOOL.
-"""),
+- NO OTHER RESPONSES ALLOWED
+- NO MAKING UP INFORMATION
+- NO REPHRASING ALLOWED
+- ONLY USE INFORMATION FROM TOOL
+- NEVER MODIFY GUEST'S REQUEST
+- NEVER CREATE YOUR OWN GREETINGS
+- NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
                 HumanMessage(content="{input}"),
                 MessagesPlaceholder(variable_name="chat_history"),
                 MessagesPlaceholder(variable_name="agent_scratchpad")
@@ -240,23 +235,18 @@ with st.form(key="chat_form", clear_on_submit=True):
 
     if submit_button and user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
-
+        
         if st.session_state.agent_executor:
             with st.spinner("Thinking..."):
                 try:
-                    # Determine the response based on input and chat history
                     response = st.session_state.agent_executor.invoke({
                         "input": user_input,
                         "chat_history": st.session_state.chat_history
                     })
-
+                    
                     st.session_state.chat_history.append(user_input)
                     st.session_state.chat_history.append(response['output'])
-
-                    # Detect table reservation confirmation
-                    if "reserved Table number" in response["output"]:
-                        reserved_table = True
-
+                    
                     st.session_state.messages.append({
                         "role": "assistant",
                         "content": response["output"]
@@ -265,5 +255,5 @@ with st.form(key="chat_form", clear_on_submit=True):
                     st.error(f"Error processing request: {str(e)}")
         else:
             st.error("Agent not properly initialized. Please check your configuration.")
-
+        
         st.rerun()
