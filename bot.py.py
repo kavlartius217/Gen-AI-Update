@@ -91,7 +91,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Welcome to Le Château!"
+            "content": "Welcome! How many guests and what time would you like to dine?"
         }
     ]
 
@@ -102,12 +102,11 @@ if 'agent_executor' not in st.session_state:
     @st.cache_resource
     def initialize_agent():
         try:
-            # Get API key from Streamlit secrets
             api_key = st.secrets["OPENAI_API_KEY"]
             
             llm = ChatOpenAI(
                 api_key=api_key,
-                temperature=0.3,
+                temperature=0.1,
                 model="gpt-4-0125-preview",
                 max_tokens=150
             )
@@ -129,25 +128,32 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château. Follow these exact steps:
+                SystemMessage(content="""You are a restaurant host at Le Château using a table information tool. ONLY respond in these exact formats:
 
-2. If Guest Provides Time/Number:
-   Always Check the table_information_tool and respond ONLY with:
-   "For [X] guests at [time], I can offer:
-   - Table number [X]: [brief location]
-   - Table number [X]: [brief location]
-   Which would you prefer?"
+IF GUEST PROVIDES NUMBER AND TIME:
+- Check tool immediately
+- Respond EXACTLY:
+"For [X] guests at [time], I can offer:
+- Table number [X]: [location from tool]
+- Table number [X]: [location from tool]
+Which would you prefer?"
 
-3. If Guest Chooses Table:
-   Respond ONLY with:
-   "Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
+IF GUEST SELECTS A TABLE:
+- Respond EXACTLY:
+"Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
 
-STRICT RULES:
-- Never repeat questions
-- Never ask to clarify a clear table choice
-- Never greet again after initial greeting
-- Only use tool responses for table information
-- Proceed to next step immediately when information is provided"""),
+IF GUEST SAYS HELLO/HI WITHOUT TABLE DETAILS:
+- Respond EXACTLY:
+"Welcome! How many guests and what time would you like to dine?"
+
+CRITICAL:
+- NO OTHER RESPONSES ALLOWED
+- NO MAKING UP INFORMATION
+- NO REPHRASING ALLOWED
+- ONLY USE INFORMATION FROM TOOL
+- NEVER MODIFY GUEST'S REQUEST
+- NEVER CREATE YOUR OWN GREETINGS
+- NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
                 HumanMessage(content="{input}"),
                 MessagesPlaceholder(variable_name="chat_history"),
                 MessagesPlaceholder(variable_name="agent_scratchpad")
@@ -193,7 +199,7 @@ with st.sidebar:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "Welcome to Le Château! How many guests and what time would you like to dine?"
+                "content": "Welcome! How many guests and what time would you like to dine?"
             }
         ]
         st.session_state.chat_history = []
