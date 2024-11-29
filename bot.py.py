@@ -98,6 +98,14 @@ if 'messages' not in st.session_state:
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
+if 'current_reservation' not in st.session_state:
+    st.session_state.current_reservation = {
+        'guests': None,
+        'time': None,
+        'table': None,
+        'offered_tables': []
+    }
+
 if 'agent_executor' not in st.session_state:
     @st.cache_resource
     def initialize_agent():
@@ -128,34 +136,38 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château using a table_information_tool. ONLY respond in these exact formats based on the user input:
+                SystemMessage(content="""You are a restaurant host at Le Château using a table_information_tool. Follow these rules exactly:
 
-IF GUEST PROVIDES NUMBER AND TIME:
+1. FOR INITIAL GREETINGS (hi/hello with no details):
+Respond EXACTLY:
+"Welcome! How many guests and what time would you like to dine?"
+
+2. FOR RESERVATION REQUESTS WITH GUESTS AND TIME:
 - Check tool immediately
+- Extract number of guests and time
+- Store table numbers for verification
 - Respond EXACTLY:
 "For [X] guests at [time], I can offer:
 - Table number [X]: [location from tool]
 - Table number [X]: [location from tool]
 Which would you prefer?"
 
-IF GUEST SELECTS A TABLE:
+3. FOR TABLE SELECTION:
+- ONLY proceed if user mentions specific table number
+- ONLY confirm tables previously offered
+- Use stored guest count and time
 - Respond EXACTLY:
 "Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
 
-IF GUEST SAYS HELLO/HI WITHOUT TABLE DETAILS:
-- Respond EXACTLY:
-"Welcome! How many guests and what time would you like to dine?"
-
-CRITICAL:
-- NO OTHER RESPONSES ALLOWED
-- NO MAKING UP INFORMATION
-- NO REPHRASING ALLOWED
-- ONLY USE INFORMATION FROM TOOL
-- NEVER MODIFY GUEST'S REQUEST
-- NEVER CREATE YOUR OWN GREETINGS
-- NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
-                HumanMessage(content="{input}"),
+CRITICAL RULES:
+- Use chat_history to verify previous offers
+- NEVER make up table information
+- ONLY use data from tool
+- NO additional greetings or text
+- NO rephrasing of templates
+- MUST match EXACT response formats"""),
                 MessagesPlaceholder(variable_name="chat_history"),
+                HumanMessage(content="{input}"),
                 MessagesPlaceholder(variable_name="agent_scratchpad")
             ])
             
@@ -199,10 +211,16 @@ with st.sidebar:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "Welcome to Le Château "
+                "content": "Welcome to Le Château!"
             }
         ]
         st.session_state.chat_history = []
+        st.session_state.current_reservation = {
+            'guests': None,
+            'time': None,
+            'table': None,
+            'offered_tables': []
+        }
         st.rerun()
 
 # Main chat interface
@@ -239,13 +257,22 @@ with st.form(key="chat_form", clear_on_submit=True):
         if st.session_state.agent_executor:
             with st.spinner("Thinking..."):
                 try:
+                    # Include the last few messages for context
+                    recent_history = st.session_state.chat_history[-4:] if st.session_state.chat_history else []
+                    
                     response = st.session_state.agent_executor.invoke({
                         "input": user_input,
-                        "chat_history": st.session_state.chat_history
+                        "chat_history": recent_history
                     })
                     
-                    st.session_state.chat_history.append(user_input)
-                    st.session_state.chat_history.append(response['output'])
+                    st.session_state.chat_history.append({
+                        "role": "user",
+                        "content": user_input
+                    })
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": response['output']
+                    })
                     
                     st.session_state.messages.append({
                         "role": "assistant",
