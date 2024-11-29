@@ -111,6 +111,7 @@ CRITICAL:
 - NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
                 HumanMessage(content="{input}"),
                 MessagesPlaceholder(variable_name="chat_history")
+                MessagesPlaceholder(variable_name="agent_scratchpad")
             ])
 
             agent = create_openai_tools_agent(llm, [tool], prompt)
