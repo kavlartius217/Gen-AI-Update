@@ -132,7 +132,7 @@ if 'agent_executor' not in st.session_state:
                 SystemMessage(content="""You are a restaurant host at Le Château. Follow these exact steps:
 
 2. If Guest Provides Time/Number:
-   Always Check the tool and respond ONLY with:
+   Always Check the table_information_tool and respond ONLY with:
    "For [X] guests at [time], I can offer:
    - Table number [X]: [brief location]
    - Table number [X]: [brief location]
