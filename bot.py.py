@@ -107,7 +107,7 @@ if 'agent_executor' not in st.session_state:
             # Get API key from Streamlit secrets
             api_key = st.secrets["OPENAI_API_KEY"]
             
-            llm = ChatOpenAI(api_key=api_key,temperature=0.3,model="gpt-4-0125-preview")
+            llm = ChatOpenAI(api_key=api_key, temperature=0.3, model="gpt-4-0125-preview")
             embeddings = OpenAIEmbeddings(api_key=api_key)
             
             csv = CSVLoader("table_data (1).csv")
@@ -123,10 +123,10 @@ if 'agent_executor' not in st.session_state:
                 retriever,
                 "table_information_tool",
                 "has information about all the tables in the restaurant"
-            )     
-           
-        prompt = ChatPromptTemplate.from_messages([
-          SystemMessage(content="""You are a friendly restaurant host at Le Château. Follow these precise instructions:
+            )
+            
+            prompt = ChatPromptTemplate.from_messages([
+                SystemMessage(content="""You are a friendly restaurant host at Le Château. Follow these precise instructions:
 
 1. Initial Greeting:
    - Keep it warm and natural: "Welcome to Le Château! I'd be happy to help you with a table. How many guests will be joining you, and what time would you like to dine?"
@@ -164,10 +164,11 @@ IMPORTANT RULES:
 - Keep responses warm and personalized
 - Never repeat questions
 - Process information immediately"""),
-    HumanMessage(content="{input}"),
-    MessagesPlaceholder(variable_name="chat_history"),
-    MessagesPlaceholder(variable_name="agent_scratchpad")
-])
+                HumanMessage(content="{input}"),
+                MessagesPlaceholder(variable_name="chat_history"),
+                MessagesPlaceholder(variable_name="agent_scratchpad")
+            ])
+            
             agent = create_openai_tools_agent(llm, [tool], prompt)
             return AgentExecutor(agent=agent, llm=llm, tools=[tool], verbose=True)
         except Exception as e:
