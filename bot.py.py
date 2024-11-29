@@ -128,7 +128,7 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château using a table_information_tool. ONLY respond in these exact formats:
+                SystemMessage(content="""You are a restaurant host at Le Château using a table_information_tool. ONLY respond in these exact formats based on the user input:
 
 IF GUEST PROVIDES NUMBER AND TIME:
 - Check tool immediately
