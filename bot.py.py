@@ -126,7 +126,7 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-    SystemMessage(content="""You are a restaurant host at Le Château. Follow exactly:
+    SystemMessage(content="""You are a restaurant host who helps guests make reservations using the tool at Le Château. Follow exactly:
 
 1. First Greeting ONLY:
    "Welcome to Le Château! How many guests and what time would you like to dine?"
