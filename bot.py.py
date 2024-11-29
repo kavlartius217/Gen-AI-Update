@@ -6,7 +6,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.tools.retriever import create_retriever_tool
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import create_openai_tools_agent, AgentExecutor
-from langchain.schema import SystemMessage, HumanMessage
+from langchain.schema import SystemMessage, HumanMessage, AIMessage
 
 # Page config
 st.set_page_config(
@@ -15,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for chat interface
+# Custom CSS
 st.markdown("""
     <style>
     .stApp {
@@ -86,100 +86,118 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
+# Initialize session states
 if 'messages' not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": "Welcome to Le Château!"
-        }
-    ]
+    st.session_state.messages = [{"role": "assistant", "content": "Welcome to Le Château!"}]
 
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
-if 'current_reservation' not in st.session_state:
-    st.session_state.current_reservation = {
+if 'reservation_state' not in st.session_state:
+    st.session_state.reservation_state = {
+        'status': 'initial',  # States: initial, awaiting_details, tables_offered, confirmed
         'guests': None,
         'time': None,
         'table': None,
-        'offered_tables': []
+        'offered_tables': [],
+        'last_response': None
     }
 
-if 'agent_executor' not in st.session_state:
-    @st.cache_resource
-    def initialize_agent():
+def parse_reservation_request(text):
+    """Parse guest count and time from reservation request"""
+    text = text.lower()
+    if 'table for' in text and 'at' in text:
         try:
-            api_key = st.secrets["OPENAI_API_KEY"]
-            
-            llm = ChatOpenAI(
-                api_key=api_key,
-                temperature=0.1,
-                model="gpt-4-0125-preview",
-                max_tokens=150
-            )
-            embeddings = OpenAIEmbeddings(api_key=api_key)
-            
-            csv = CSVLoader("table_data (1).csv")
-            csv = csv.load()
-            
-            rcts = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-            docs = rcts.split_documents(csv)
-            
-            db = FAISS.from_documents(docs, embeddings)
-            retriever = db.as_retriever()
-            
-            tool = create_retriever_tool(
-                retriever,
-                "table_information_tool",
-                "has information about all the tables in the restaurant"
-            )
-            
-            prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château using a table_information_tool. Follow these rules exactly:
+            parts = text.split('at')
+            guests_part = parts[0].split('table for')[1]
+            guests = int(''.join(filter(str.isdigit, guests_part)))
+            time = parts[1].strip()
+            return {'guests': guests, 'time': time}
+        except:
+            return None
+    return None
 
-1. FOR INITIAL GREETINGS (hi/hello with no details):
-Respond EXACTLY:
+def extract_table_number(text, offered_tables):
+    """Extract table number from selection message"""
+    text = text.lower()
+    if not offered_tables:
+        return None
+        
+    if 'table' in text and any(str(table) in text for table in offered_tables):
+        for table in offered_tables:
+            if str(table) in text:
+                return table
+    return None
+
+def initialize_agent():
+    """Initialize the LangChain agent"""
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+        
+        llm = ChatOpenAI(
+            api_key=api_key,
+            temperature=0,
+            model="gpt-4-0125-preview",
+            max_tokens=150
+        )
+        
+        embeddings = OpenAIEmbeddings(api_key=api_key)
+        
+        # Load and process table data
+        loader = CSVLoader("table_data (1).csv")
+        documents = loader.load()
+        
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        docs = text_splitter.split_documents(documents)
+        
+        vectorstore = FAISS.from_documents(docs, embeddings)
+        retriever = vectorstore.as_retriever()
+        
+        tool = create_retriever_tool(
+            retriever,
+            "table_information_tool",
+            "Search for table information in the restaurant"
+        )
+
+        # Define the agent prompt
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content="""You are a restaurant host at Le Château. Follow these EXACT response formats:
+
+1. For greetings or unclear requests:
 "Welcome! How many guests and what time would you like to dine?"
 
-2. FOR RESERVATION REQUESTS WITH GUESTS AND TIME:
-- Check tool immediately
-- Extract number of guests and time
-- Store table numbers for verification
-- Respond EXACTLY:
+2. For reservation requests with guest count and time:
 "For [X] guests at [time], I can offer:
-- Table number [X]: [location from tool]
-- Table number [X]: [location from tool]
+- Table number [X]: [location]
+- Table number [X]: [location]
 Which would you prefer?"
 
-3. FOR TABLE SELECTION:
-- ONLY proceed if user mentions specific table number
-- ONLY confirm tables previously offered
-- Use stored guest count and time
-- Respond EXACTLY:
+3. For table selection (only if table was previously offered):
 "Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
 
-CRITICAL RULES:
-- Use chat_history to verify previous offers
-- NEVER make up table information
-- ONLY use data from tool
-- NO additional greetings or text
-- NO rephrasing of templates
-- MUST match EXACT response formats"""),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessage(content="{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad")
-            ])
-            
-            agent = create_openai_tools_agent(llm, [tool], prompt)
-            return AgentExecutor(agent=agent, llm=llm, tools=[tool], verbose=True)
-        except Exception as e:
-            st.error(f"Error initializing agent: {str(e)}")
-            return None
-    
+STRICT RULES:
+- Only respond with these exact formats
+- Don't add any other text
+- Only offer tables found in the tool
+- Only confirm tables that were previously offered
+- Maintain context using chat_history"""),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessage(content="{input}")
+        ])
+
+        # Create and return the agent
+        agent = create_openai_tools_agent(llm, [tool], prompt)
+        return AgentExecutor(agent=agent, tools=[tool], verbose=True)
+        
+    except Exception as e:
+        st.error(f"Error initializing agent: {str(e)}")
+        return None
+
+# Initialize agent if not already done
+if 'agent_executor' not in st.session_state:
     st.session_state.agent_executor = initialize_agent()
 
-# Sidebar with restaurant information
+# Sidebar
 with st.sidebar:
     st.header("🏰 Le Château")
     
@@ -206,44 +224,16 @@ with st.sidebar:
         - 15-minute grace period for late arrivals
         - Cancellations accepted up to 4 hours before reservation
         """)
-    
-    if st.button("Clear Chat History"):
-        st.session_state.messages = [
-            {
-                "role": "assistant",
-                "content": "Welcome to Le Château!"
-            }
-        ]
-        st.session_state.chat_history = []
-        st.session_state.current_reservation = {
-            'guests': None,
-            'time': None,
-            'table': None,
-            'offered_tables': []
-        }
-        st.rerun()
 
 # Main chat interface
 st.title("🍽️ Restaurant Reservation Chat")
 
 # Display chat messages
 for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.markdown(f"""
-        <div class="chat-message user">
-            <div class="avatar">👤</div>
-            <div class="message">{message["content"]}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class="chat-message assistant">
-            <div class="avatar">🤖</div>
-            <div class="message">{message["content"]}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
 
-# Chat input
+# Chat input form
 with st.form(key="chat_form", clear_on_submit=True):
     cols = st.columns([4, 1])
     with cols[0]:
@@ -252,19 +242,41 @@ with st.form(key="chat_form", clear_on_submit=True):
         submit_button = st.form_submit_button("Send", use_container_width=True)
 
     if submit_button and user_input:
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
         
         if st.session_state.agent_executor:
             with st.spinner("Thinking..."):
                 try:
-                    # Include the last few messages for context
-                    recent_history = st.session_state.chat_history[-4:] if st.session_state.chat_history else []
+                    # Check for reservation request
+                    reservation_details = parse_reservation_request(user_input)
+                    if reservation_details:
+                        st.session_state.reservation_state.update(reservation_details)
+                        st.session_state.reservation_state['status'] = 'tables_offered'
                     
+                    # Format chat history for context
+                    formatted_history = []
+                    for msg in st.session_state.chat_history[-4:]:  # Last 4 messages
+                        if msg["role"] == "user":
+                            formatted_history.append(HumanMessage(content=msg["content"]))
+                        else:
+                            formatted_history.append(AIMessage(content=msg["content"]))
+                    
+                    # Get agent response
                     response = st.session_state.agent_executor.invoke({
                         "input": user_input,
-                        "chat_history": recent_history
+                        "chat_history": formatted_history
                     })
                     
+                    # Process table selection
+                    if st.session_state.reservation_state['status'] == 'tables_offered':
+                        selected_table = extract_table_number(user_input, 
+                                                           st.session_state.reservation_state['offered_tables'])
+                        if selected_table:
+                            st.session_state.reservation_state['table'] = selected_table
+                            st.session_state.reservation_state['status'] = 'confirmed'
+                    
+                    # Update chat history
                     st.session_state.chat_history.append({
                         "role": "user",
                         "content": user_input
@@ -274,13 +286,31 @@ with st.form(key="chat_form", clear_on_submit=True):
                         "content": response['output']
                     })
                     
+                    # Add assistant response
                     st.session_state.messages.append({
                         "role": "assistant",
                         "content": response["output"]
                     })
+                    
+                    st.session_state.reservation_state['last_response'] = response['output']
+                    
                 except Exception as e:
                     st.error(f"Error processing request: {str(e)}")
         else:
             st.error("Agent not properly initialized. Please check your configuration.")
         
         st.rerun()
+
+# Clear chat button
+if st.sidebar.button("Clear Chat"):
+    st.session_state.messages = [{"role": "assistant", "content": "Welcome to Le Château!"}]
+    st.session_state.chat_history = []
+    st.session_state.reservation_state = {
+        'status': 'initial',
+        'guests': None,
+        'time': None,
+        'table': None,
+        'offered_tables': [],
+        'last_response': None
+    }
+    st.rerun()
