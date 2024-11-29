@@ -110,7 +110,7 @@ CRITICAL:
 - NEVER CREATE YOUR OWN GREETINGS
 - NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
                 HumanMessage(content="{input}"),
-                MessagesPlaceholder(variable_name="chat_history")
+                MessagesPlaceholder(variable_name="chat_history"),
                 MessagesPlaceholder(variable_name="agent_scratchpad")
             ])
 
