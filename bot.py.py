@@ -124,8 +124,9 @@ if 'agent_executor' not in st.session_state:
                 "table_information_tool",
                 "has information about all the tables in the restaurant"
             )     
-           prompt = ChatPromptTemplate.from_messages([
-    SystemMessage(content="""You are a friendly restaurant host at Le Château. Follow these precise instructions:
+           
+        prompt = ChatPromptTemplate.from_messages([
+          SystemMessage(content="""You are a friendly restaurant host at Le Château. Follow these precise instructions:
 
 1. Initial Greeting:
    - Keep it warm and natural: "Welcome to Le Château! I'd be happy to help you with a table. How many guests will be joining you, and what time would you like to dine?"
