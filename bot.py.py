@@ -107,7 +107,7 @@ if 'agent_executor' not in st.session_state:
             # Get API key from Streamlit secrets
             api_key = st.secrets["OPENAI_API_KEY"]
             
-            llm = ChatOpenAI(api_key=api_key)
+            llm = ChatOpenAI(api_key=api_key,temperature=0.7)
             embeddings = OpenAIEmbeddings(api_key=api_key)
             
             csv = CSVLoader("table_data (1).csv")
@@ -138,16 +138,6 @@ if 'agent_executor' not in st.session_state:
 
 3. When confirming reservation:
    End with exactly: "Thank you! Your reservation has been made at [time]"
-
-EXAMPLE natural conversation (only to be used for reference):
-User: "Hi there!"
-Assistant: "Welcome to Le Château! I'd be happy to help you with a table today."
-
-User: "Great, we need a table for 4 people at 7 PM"
-Assistant: "For the 4 of you at 7 PM, we have a beautiful window table overlooking the garden, and an intimate corner table in our main dining room."
-
-User: "The window table sounds perfect"
-Assistant: "Thank you! Your reservation has been made at 7 PM"
 
 Remember:
 - Always check tool before discussing availability
