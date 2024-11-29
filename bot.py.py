@@ -91,9 +91,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": """👋 Welcome to Le Château! I'm your reservation assistant. 
-            
-How may I help you with your reservation today?"""
+            "content": "Welcome to Le Château! How many guests and what time would you like to dine?"
         }
     ]
 
@@ -107,7 +105,12 @@ if 'agent_executor' not in st.session_state:
             # Get API key from Streamlit secrets
             api_key = st.secrets["OPENAI_API_KEY"]
             
-            llm = ChatOpenAI(api_key=api_key, temperature=1, model="gpt-4-0125-preview",max_tokens=150)
+            llm = ChatOpenAI(
+                api_key=api_key,
+                temperature=0.3,
+                model="gpt-4-0125-preview",
+                max_tokens=150
+            )
             embeddings = OpenAIEmbeddings(api_key=api_key)
             
             csv = CSVLoader("table_data (1).csv")
@@ -126,32 +129,29 @@ if 'agent_executor' not in st.session_state:
             )
             
             prompt = ChatPromptTemplate.from_messages([
-    SystemMessage(content="""You are a restaurant host who helps guests make reservations using the tool at Le Château. Follow exactly:
+                SystemMessage(content="""You are a restaurant host at Le Château. Follow these exact steps:
 
-1. First Greeting ONLY:
-   "Welcome to Le Château! How many guests and what time would you like to dine?"
-
-2. After Guest Provides Time/Number:
-   Use tool and respond ONLY with:
+2. If Guest Provides Time/Number:
+   Check tool and respond ONLY with:
    "For [X] guests at [time], I can offer:
    - Table number [X]: [brief location]
    - Table number [X]: [brief location]
    Which would you prefer?"
 
-3. After Table Choice:
+3. If Guest Chooses Table:
    Respond ONLY with:
    "Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
 
-RULES:
+STRICT RULES:
 - Never repeat questions
-- Never ask to clarify table choice
-- Never greet twice
-- Move forward only
-- Use tool before suggesting tables"""),
-    HumanMessage(content="{input}"),
-    MessagesPlaceholder(variable_name="chat_history"),
-    MessagesPlaceholder(variable_name="agent_scratchpad")
-])
+- Never ask to clarify a clear table choice
+- Never greet again after initial greeting
+- Only use tool responses for table information
+- Proceed to next step immediately when information is provided"""),
+                HumanMessage(content="{input}"),
+                MessagesPlaceholder(variable_name="chat_history"),
+                MessagesPlaceholder(variable_name="agent_scratchpad")
+            ])
             
             agent = create_openai_tools_agent(llm, [tool], prompt)
             return AgentExecutor(agent=agent, llm=llm, tools=[tool], verbose=True)
@@ -193,9 +193,7 @@ with st.sidebar:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": """👋 Welcome to Le Château! I'm your reservation assistant. 
-                
-How may I help you with your reservation today?"""
+                "content": "Welcome to Le Château! How many guests and what time would you like to dine?"
             }
         ]
         st.session_state.chat_history = []
