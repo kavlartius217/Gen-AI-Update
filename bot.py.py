@@ -91,7 +91,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Welcome to Le Château! How many guests and what time would you like to dine?"
+            "content": "Welcome to Le Château!"
         }
     ]
 
