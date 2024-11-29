@@ -182,7 +182,8 @@ STRICT RULES:
 - Only confirm tables that were previously offered
 - Maintain context using chat_history"""),
             MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessage(content="{input}")
+            HumanMessage(content="{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad")
         ])
 
         # Create and return the agent
