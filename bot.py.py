@@ -16,28 +16,83 @@ st.set_page_config(
 )
 
 # Custom CSS for chat interface
-st.markdown("""<style>
-    .stApp { margin-bottom: 50px; }
-    .chat-message { padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex; align-items: flex-start; }
-    .chat-message.user { background-color: #F0F2F6; }
-    .chat-message.assistant { background-color: #E8F0FE; }
-    .chat-message .avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 0.8rem; font-size: 20px; display: flex; align-items: center; justify-content: center; }
-    .chat-message .message { flex-grow: 1; }
-    div[data-testid="stForm"] { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 600px; background-color: white; padding: 0.5rem 1rem; z-index: 100; border-top: 1px solid #ddd; display: flex; gap: 8px; }
-    div[data-testid="stForm"] > div { display: flex; gap: 8px; width: 100%; }
-    div[data-testid="stTextInput"] div { padding-top: 0 !important; padding-bottom: 0 !important; }
-    button[kind="primaryFormSubmit"] { height: 35px !important; margin-top: 0 !important; padding: 0 20px !important; }
-    .stTextInput input { height: 35px !important; }
-    section[data-testid="stSidebar"] { width: 300px; }
+st.markdown("""
+    <style>
+    .stApp {
+        margin-bottom: 50px;
+    }
+    .chat-message {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: flex-start;
+    }
+    .chat-message.user {
+        background-color: #F0F2F6;
+    }
+    .chat-message.assistant {
+        background-color: #E8F0FE;
+    }
+    .chat-message .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        margin-right: 0.8rem;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chat-message .message {
+        flex-grow: 1;
+    }
+    div[data-testid="stForm"] {
+        position: fixed;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        background-color: white;
+        padding: 0.5rem 1rem;
+        z-index: 100;
+        border-top: 1px solid #ddd;
+        display: flex;
+        gap: 8px;
+    }
+    div[data-testid="stForm"] > div {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+    div[data-testid="stTextInput"] div {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    button[kind="primaryFormSubmit"] {
+        height: 35px !important;
+        margin-top: 0 !important;
+        padding: 0 20px !important;
+    }
+    .stTextInput input {
+        height: 35px !important;
+    }
+    section[data-testid="stSidebar"] {
+        width: 300px;
+    }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-</style>""", unsafe_allow_html=True)
+    </style>
+""", unsafe_allow_html=True)
 
 # Initialize session state
 if 'messages' not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "Welcome! How many guests and what time would you like to dine?"}
+        {
+            "role": "assistant",
+            "content": "Welcome! How many guests and what time would you like to dine?"
+        }
     ]
 
 if 'chat_history' not in st.session_state:
@@ -48,43 +103,35 @@ if 'agent_executor' not in st.session_state:
     def initialize_agent():
         try:
             api_key = st.secrets["OPENAI_API_KEY"]
-
-            # Initialize LLM and Embeddings
+            
             llm = ChatOpenAI(
                 api_key=api_key,
-                temperature=0.3,
+                temperature=0.1,
                 model="gpt-4-0125-preview",
                 max_tokens=150
             )
             embeddings = OpenAIEmbeddings(api_key=api_key)
-
-            # Load and process data
+            
             csv = CSVLoader("table_data (1).csv")
             csv = csv.load()
-            rcts = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            
+            rcts = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
             docs = rcts.split_documents(csv)
-
-            # Create vector store and retriever
+            
             db = FAISS.from_documents(docs, embeddings)
             retriever = db.as_retriever()
-
-            # Test retriever
-            test_query = "Table for 4 guests at 7 PM"
-            results = retriever.get_relevant_documents(test_query)
-            print("Retriever test results:", results)
-
+            
             tool = create_retriever_tool(
                 retriever,
                 "table_information_tool",
                 "has information about all the tables in the restaurant"
             )
-
-            # Define prompt
+            
             prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a restaurant host at Le Château using a table information tool. ONLY respond in these exact formats:
+                SystemMessage(content="""You are a restaurant host at Le Château using a table information tool. Respond in these exact formats:
 
 IF GUEST PROVIDES NUMBER AND TIME:
-- Check tool immediately
+- Check tool immediately.
 - Respond EXACTLY:
 "For [X] guests at [time], I can offer:
 - Table number [X]: [location from tool]
@@ -98,49 +145,52 @@ IF GUEST SELECTS A TABLE:
 IF TOOL RETURNS NO RESULTS:
 - Respond: "Sorry, no tables match your request. Would you like to try another time or party size?"
 
+IF GUEST RESPONDS WITH "RESERVE IT":
+- Ensure the selected table matches their earlier choice. Respond EXACTLY:
+"Perfect! I've reserved Table number [X] for [Y] guests at [time]. Looking forward to welcoming you!"
+
 IF GUEST SAYS HELLO/HI WITHOUT TABLE DETAILS:
 - Respond EXACTLY:
 "Welcome! How many guests and what time would you like to dine?"
 
 CRITICAL:
-- NO OTHER RESPONSES ALLOWED
-- NO MAKING UP INFORMATION
-- ONLY USE INFORMATION FROM TOOL
-- NEVER MODIFY GUEST'S REQUEST
-- NEVER CREATE YOUR OWN GREETINGS
-- NEVER ADD ADDITIONAL TEXT TO RESPONSES"""),
+- NO OTHER RESPONSES ALLOWED.
+- DO NOT REPEAT QUESTIONS UNNECESSARILY.
+- DO NOT MAKE UP INFORMATION.
+- ONLY USE INFORMATION FROM THE TOOL.
+"""),
                 HumanMessage(content="{input}"),
                 MessagesPlaceholder(variable_name="chat_history"),
                 MessagesPlaceholder(variable_name="agent_scratchpad")
             ])
-
+            
             agent = create_openai_tools_agent(llm, [tool], prompt)
             return AgentExecutor(agent=agent, llm=llm, tools=[tool], verbose=True)
         except Exception as e:
             st.error(f"Error initializing agent: {str(e)}")
             return None
-
+    
     st.session_state.agent_executor = initialize_agent()
 
 # Sidebar with restaurant information
 with st.sidebar:
     st.header("🏰 Le Château")
-
+    
     with st.expander("📍 Hours & Location"):
         st.markdown("""
         **Hours of Operation:**
         - Mon-Thu: 11:00 AM - 10:00 PM
         - Fri-Sat: 11:00 AM - 11:00 PM
         - Sunday: 10:00 AM - 9:00 PM
-
+        
         **Address:**
         123 Gourmet Street
         Foodie City, FC 12345
-
+        
         **Contact:**
         📞 (555) 123-4567
         """)
-
+    
     with st.expander("ℹ️ Reservation Policy"):
         st.markdown("""
         - Reservations recommended for parties of all sizes
@@ -149,10 +199,13 @@ with st.sidebar:
         - 15-minute grace period for late arrivals
         - Cancellations accepted up to 4 hours before reservation
         """)
-
+    
     if st.button("Clear Chat History"):
         st.session_state.messages = [
-            {"role": "assistant", "content": "Welcome! How many guests and what time would you like to dine?"}
+            {
+                "role": "assistant",
+                "content": "Welcome! How many guests and what time would you like to dine?"
+            }
         ]
         st.session_state.chat_history = []
         st.rerun()
@@ -163,9 +216,19 @@ st.title("🍽️ Restaurant Reservation Chat")
 # Display chat messages
 for message in st.session_state.messages:
     if message["role"] == "user":
-        st.markdown(f"""<div class="chat-message user"><div class="avatar">👤</div><div class="message">{message["content"]}</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="chat-message user">
+            <div class="avatar">👤</div>
+            <div class="message">{message["content"]}</div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown(f"""<div class="chat-message assistant"><div class="avatar">🤖</div><div class="message">{message["content"]}</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="chat-message assistant">
+            <div class="avatar">🤖</div>
+            <div class="message">{message["content"]}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Chat input
 with st.form(key="chat_form", clear_on_submit=True):
@@ -181,6 +244,7 @@ with st.form(key="chat_form", clear_on_submit=True):
         if st.session_state.agent_executor:
             with st.spinner("Thinking..."):
                 try:
+                    # Determine the response based on input and chat history
                     response = st.session_state.agent_executor.invoke({
                         "input": user_input,
                         "chat_history": st.session_state.chat_history
@@ -188,6 +252,10 @@ with st.form(key="chat_form", clear_on_submit=True):
 
                     st.session_state.chat_history.append(user_input)
                     st.session_state.chat_history.append(response['output'])
+
+                    # Detect table reservation confirmation
+                    if "reserved Table number" in response["output"]:
+                        reserved_table = True
 
                     st.session_state.messages.append({
                         "role": "assistant",
