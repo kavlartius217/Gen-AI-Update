@@ -107,7 +107,7 @@ if 'agent_executor' not in st.session_state:
             # Get API key from Streamlit secrets
             api_key = st.secrets["OPENAI_API_KEY"]
             
-            llm = ChatOpenAI(api_key=api_key,temperature=0.7,model="gpt-4o-mini")
+            llm = ChatOpenAI(api_key=api_key,temperature=0.3,model="gpt-4-0125-preview")
             embeddings = OpenAIEmbeddings(api_key=api_key)
             
             csv = CSVLoader("table_data (1).csv")
