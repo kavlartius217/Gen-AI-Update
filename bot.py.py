@@ -160,7 +160,7 @@ def initialize_agent():
 
         # Define the agent prompt
         prompt=ChatPromptTemplate.from_messages([
-    SystemMessage(content="You are a reservation chatbot that makes reservations based on the user input. Based on the user input and referencing the tool, suggest the user tables available at the specified time and the location of the respective tables. After the user makes a choice, confirm the reservation and make no further conversation"),
+    SystemMessage(content="You are a reservation chatbot that makes reservations based on the user input AND DOESN'T REPEAT RESPONSES. Based on the user input and referencing the tool, suggest the user tables available at the specified time and the location of the respective tables. After the user makes a choice, confirm the reservation and make no further conversation"),
     HumanMessage(content="{input}"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
     MessagesPlaceholder(variable_name="chat_history")
