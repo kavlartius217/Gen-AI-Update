@@ -400,6 +400,7 @@ with st.sidebar:
         """)
 
 # Main chat interface
+# Main chat interface
 st.title("🍽️ Restaurant Reservation Chat")
 
 # Display chat messages
@@ -409,13 +410,16 @@ for message in st.session_state.messages:
 
 # Chat input form with voice input
 with st.form(key="chat_form", clear_on_submit=True):
-cols = st.columns([3, 1, 1])
+    # Create three columns for input field, voice button, and send button
+    cols = st.columns([3, 1, 1])
     with cols[0]:
         user_input = st.text_input("Message", key="user_input", label_visibility="collapsed")
     with cols[1]:
         voice_button = st.form_submit_button("🎤 Voice", use_container_width=True)
     with cols[2]:
         submit_button = st.form_submit_button("Send", use_container_width=True)
+
+    # Rest of your form handling code, properly indented...
 
     # Handle voice input
     if voice_button:
