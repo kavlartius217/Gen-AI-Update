@@ -1,19 +1,25 @@
-# Core dependencies
-streamlit==1.31.0
+# Core Framework
+streamlit>=1.31.0,<2.0.0
+python-dotenv>=1.0.0,<2.0.0
+
+# LangChain Ecosystem
 langchain==0.1.0
 langchain-openai==0.0.2.post1
 langchain-community==0.0.13
-faiss-cpu==1.7.4
-pandas==2.1.4
-python-dotenv==1.0.0
 
-# Voice input dependencies
+# Vector Store
+faiss-cpu==1.7.4
+
+# Data Processing
+pandas>=2.1.4,<3.0.0
+numpy>=1.24.0,<2.0.0
+
+# Voice Processing
 streamlit-webrtc==0.47.1
 SpeechRecognition==3.10.0
 pydub==0.25.1
-numpy==1.26.3
 av==11.0.0
 
-# Additional utilities
-python-dateutil==2.8.2
-regex==2023.12.25
+# Utilities
+python-dateutil>=2.8.2,<3.0.0
+regex>=2023.12.25
