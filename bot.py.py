@@ -7,8 +7,20 @@ from langchain.tools.retriever import create_retriever_tool
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import create_openai_tools_agent, AgentExecutor
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, WebRtcStreamerContext
+import speech_recognition as sr
+from typing import Union
+import queue
+import logging
+import threading
+import numpy as np
+import av
+import pydub
 from datetime import datetime
 import re
+
+# Initialize logging
+logger = logging.getLogger(__name__)
 
 # Page config
 st.set_page_config(
@@ -87,6 +99,97 @@ st.markdown("""
     header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
+
+# Voice processing class
+class AudioProcessor:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.transcript_queue = queue.Queue()
+        self.audio_queue = queue.Queue()
+        self.is_processed = threading.Event()
+
+    def process_audio(self, frame: av.AudioFrame) -> av.AudioFrame:
+        """Process audio frames and convert to text"""
+        try:
+            # Convert audio frame to numpy array
+            audio_data = frame.to_ndarray()
+            
+            # Add to audio queue
+            self.audio_queue.put(audio_data)
+            
+            if not self.is_processed.is_set():
+                # Process accumulated audio when enough data is collected
+                self.process_accumulated_audio()
+                
+            return frame
+        except Exception as e:
+            logger.error(f"Error processing audio frame: {str(e)}")
+            return frame
+
+    def process_accumulated_audio(self):
+        """Process accumulated audio data and convert to text"""
+        try:
+            # Collect audio data
+            audio_data = []
+            while not self.audio_queue.empty():
+                audio_data.append(self.audio_queue.get())
+            
+            if not audio_data:
+                return
+
+            # Combine audio data
+            combined_audio = np.concatenate(audio_data)
+            
+            # Convert to audio file format
+            audio_segment = pydub.AudioSegment(
+                combined_audio.tobytes(), 
+                frame_rate=48000,
+                sample_width=2,
+                channels=1
+            )
+
+            # Convert to wav
+            audio_wav = audio_segment.export(format="wav").read()
+            
+            # Recognize speech
+            with sr.AudioFile(audio_wav) as source:
+                audio = self.recognizer.record(source)
+                text = self.recognizer.recognize_google(audio)
+                if text:
+                    self.transcript_queue.put(text)
+                    self.is_processed.set()
+        
+        except sr.UnknownValueError:
+            logger.info("Speech not recognized")
+        except Exception as e:
+            logger.error(f"Error processing accumulated audio: {str(e)}")
+
+def get_voice_input() -> Union[str, None]:
+    """Get voice input and return transcribed text"""
+    try:
+        processor = AudioProcessor()
+        
+        # WebRTC streamer configuration
+        ctx = webrtc_streamer(
+            key="voice-input",
+            mode=WebRtcMode.SENDONLY,
+            audio_receiver_size=1024,
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            media_stream_constraints={"video": False, "audio": True},
+            async_processing=True,
+            video_processor_factory=None,
+            audio_processor_factory=lambda: processor
+        )
+
+        if ctx.audio_receiver:
+            if not processor.transcript_queue.empty():
+                return processor.transcript_queue.get()
+    
+    except Exception as e:
+        st.error(f"Error getting voice input: {str(e)}")
+        return None
+
+    return None
 
 def init_session_state():
     """Initialize session state variables"""
@@ -183,7 +286,7 @@ def initialize_agent():
         embeddings = OpenAIEmbeddings(api_key=api_key)
         
         # Load and process table data
-        loader = CSVLoader("table_data (1).csv")
+        loader = CSVLoader("table_data.csv")
         documents = loader.load()
         
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
@@ -304,23 +407,37 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-# Chat input form
+# Chat input form with voice input
 with st.form(key="chat_form", clear_on_submit=True):
-    cols = st.columns([4, 1])
+cols = st.columns([3, 1, 1])
     with cols[0]:
         user_input = st.text_input("Message", key="user_input", label_visibility="collapsed")
     with cols[1]:
+        voice_button = st.form_submit_button("🎤 Voice", use_container_width=True)
+    with cols[2]:
         submit_button = st.form_submit_button("Send", use_container_width=True)
 
-    if submit_button and user_input:
+    # Handle voice input
+    if voice_button:
+        with st.spinner("Listening..."):
+            voice_text = get_voice_input()
+            if voice_text:
+                st.session_state.user_input = voice_text
+                st.rerun()
+
+    # Handle text/voice submission
+    if submit_button and (user_input or st.session_state.get('user_input')):
+        # Get the final input (either typed or from voice)
+        final_input = user_input or st.session_state.get('user_input', '')
+        
         # Add user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        st.session_state.messages.append({"role": "user", "content": final_input})
         
         if st.session_state.agent_executor:
             with st.spinner("Thinking..."):
                 try:
                     # Parse reservation request
-                    reservation_details = parse_reservation_request(user_input)
+                    reservation_details = parse_reservation_request(final_input)
                     if reservation_details:
                         st.session_state.reservation_state.update(reservation_details)
                         st.session_state.reservation_state['status'] = 'tables_offered'
@@ -335,7 +452,7 @@ with st.form(key="chat_form", clear_on_submit=True):
                     
                     # Get agent response
                     response = st.session_state.agent_executor.invoke({
-                        "input": user_input,
+                        "input": final_input,
                         "chat_history": formatted_history
                     })
                     
@@ -348,7 +465,7 @@ with st.form(key="chat_form", clear_on_submit=True):
                     # Check for table selection
                     if st.session_state.reservation_state['status'] == 'tables_offered':
                         selected_table = extract_table_number(
-                            user_input, 
+                            final_input, 
                             st.session_state.reservation_state['offered_tables']
                         )
                         if selected_table:
@@ -358,7 +475,7 @@ with st.form(key="chat_form", clear_on_submit=True):
                     # Update chat history
                     st.session_state.chat_history.append({
                         "role": "user",
-                        "content": user_input
+                        "content": final_input
                     })
                     st.session_state.chat_history.append({
                         "role": "assistant",
@@ -376,6 +493,10 @@ with st.form(key="chat_form", clear_on_submit=True):
         else:
             st.error("Agent not properly initialized. Please check your configuration.")
         
+        # Clear voice input from session state
+        if 'user_input' in st.session_state:
+            del st.session_state.user_input
+            
         st.rerun()
 
 # Clear chat button
@@ -392,4 +513,6 @@ if st.sidebar.button("Clear Chat"):
         'last_response': None,
         'confirmation_number': None
     }
+    if 'user_input' in st.session_state:
+        del st.session_state.user_input
     st.rerun()
