@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS
+# Custom CSS for styling
 st.markdown("""
     <style>
     .stApp {
@@ -91,7 +91,7 @@ st.markdown("""
 def init_session_state():
     """Initialize session state variables"""
     if 'messages' not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Welcome to Le Château! How may I assist you today?"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Hello! Welcome to Le Château. How may I assist you today?"}]
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     if 'reservation_state' not in st.session_state:
@@ -105,8 +105,6 @@ def init_session_state():
             'last_response': None,
             'confirmation_number': None
         }
-    if 'conversation_context' not in st.session_state:
-        st.session_state.conversation_context = []
 
 def validate_time_format(time_str):
     """Validate and standardize time format"""
@@ -149,7 +147,7 @@ def parse_reservation_request(text):
     return reservation_info if reservation_info else None
 
 def extract_table_number(text, offered_tables):
-    """Extract table number from user response"""
+    """Extract table number from user input"""
     text = text.lower()
     if not offered_tables:
         return None
@@ -161,7 +159,7 @@ def extract_table_number(text, offered_tables):
         table_num = int(match.group(1))
         if table_num in offered_tables:
             return table_num
-    
+            
     # Look for any mentioned numbers that match offered tables
     numbers = re.findall(r'\d+', text)
     for num in numbers:
@@ -171,7 +169,7 @@ def extract_table_number(text, offered_tables):
     return None
 
 def initialize_agent():
-    """Initialize the LangChain agent"""
+    """Initialize the LangChain agent with improved prompt"""
     try:
         api_key = st.secrets["OPENAI_API_KEY"]
         
@@ -199,28 +197,37 @@ def initialize_agent():
         tool = create_retriever_tool(
             retriever,
             "table_information_tool",
-            "Search for available tables that match the reservation requirements"
+            "Search for available tables that match the reservation requirements. Use this to check specific table availability."
         )
 
-        system_prompt = """You are a professional restaurant reservation assistant for Le Château. Your primary responsibilities are:
+        system_prompt = """You are a warm and professional restaurant reservation assistant for Le Château. Follow these guidelines carefully:
 
-1. Handle reservation requests by checking table availability using the table_information_tool
-2. Provide clear, concise responses without repetition
-3. Maintain context of the conversation
-4. Only suggest tables that match the party size and time requirements
-5. Confirm reservations with a unique confirmation number
+1. INITIAL GREETING:
+- Respond warmly to general greetings without asking for reservation details
+- For greetings like "hi" or "hello", respond with "Hello! Welcome to Le Château. How may I assist you today?"
 
-Guidelines:
-- Always verify table availability before making suggestions
-- Don't repeat previously provided information
-- If a request is unclear, ask for specific missing details
-- Once a reservation is confirmed, provide a summary and end the conversation
-- Don't ask unnecessary follow-up questions after confirmation
+2. HANDLING RESERVATION REQUESTS:
+- When given partial information (like only time or party size), acknowledge what was provided and ask specifically for missing details
+- For "2 guests at 6pm", respond: "I'd be happy to help you with a reservation for 2 guests at 6:00 PM. What date would you like to dine with us?"
+- Always verify table availability using table_information_tool before suggesting options
 
-Current restaurant hours:
+3. RESPONSE GUIDELINES:
+- Keep responses concise and natural
+- Don't repeat previous questions
+- Use conversational language
+- Only mention missing information once
+
+4. RESERVATION CONFIRMATION:
+- Once all details are provided, check availability and suggest specific tables
+- After table selection, provide a clear confirmation with all details
+- Generate a unique confirmation number only for completed reservations
+
+Restaurant Hours:
 Mon-Thu: 11:00 AM - 10:00 PM
 Fri-Sat: 11:00 AM - 11:00 PM
-Sunday: 10:00 AM - 9:00 PM"""
+Sunday: 10:00 AM - 9:00 PM
+
+Remember: Be warm and professional, avoid repetition, and keep the conversation flowing naturally."""
 
         prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content=system_prompt),
@@ -364,8 +371,6 @@ with st.form(key="chat_form", clear_on_submit=True):
                         "content": cleaned_response
                     })
                     
-                    st.session_state.reservation_state['last_response'] = cleaned_response
-                    
                 except Exception as e:
                     st.error(f"Error processing request: {str(e)}")
         else:
@@ -375,7 +380,7 @@ with st.form(key="chat_form", clear_on_submit=True):
 
 # Clear chat button
 if st.sidebar.button("Clear Chat"):
-    st.session_state.messages = [{"role": "assistant", "content": "Welcome to Le Château! How may I assist you today?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hello! Welcome to Le Château. How may I assist you today?"}]
     st.session_state.chat_history = []
     st.session_state.reservation_state = {
         'status': 'initial',
