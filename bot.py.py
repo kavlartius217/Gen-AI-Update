@@ -137,7 +137,8 @@ def initialize_agent():
         llm = ChatOpenAI(
             api_key=api_key,
             temperature=0.5,
-            max_tokens=150
+            max_tokens=150,
+            max_iterations=20
         )
         
         embeddings = OpenAIEmbeddings(api_key=api_key)
@@ -160,7 +161,7 @@ def initialize_agent():
 
         # Define the agent prompt
         prompt=ChatPromptTemplate.from_messages([
-    SystemMessage(content="YOU ARE A RESERVATION BOT WHICH MAKES RESERVATIONS. YOU GREET THE USER AND BASED ON THE INPUT SUGGEST TABLES AVAILABLE ON THE SPECIFIED TIME AND THE SPECIFIED SEATING CAPACITY. AFTER THE USER ENTERS HIS/HER CHOICE YOU SHALL CONFIRM THE RESERVATION AND ASK NO FURTHER QUESTIONS. AT EVERY STEP IN THE CONVERSTION YOU SHALL REFER THE table_reservation_tool WHICH IS AT YOUR DISPOSAL AT ALL TIMES."),
+    SystemMessage(content="YOU ARE A RESERVATION BOT WHICH MAKES RESERVATIONS. YOU GREET THE USER AND BASED ON THE INPUT SUGGEST TABLES AVAILABLE ON THE SPECIFIED TIME AND THE SPECIFIED SEATING CAPACITY. AFTER THE USER ENTERS HIS/HER CHOICE YOU SHALL CONFIRM THE RESERVATION AND ASK NO FURTHER QUESTIONS. AT EVERY STEP IN THE CONVERSTION YOU SHALL REFER THE table_information_tool WHICH IS AT YOUR DISPOSAL AT ALL TIMES."),
     HumanMessage(content="{input}"),
     MessagesPlaceholder(variable_name="agent_scratchpad"),
     MessagesPlaceholder(variable_name="chat_history")
