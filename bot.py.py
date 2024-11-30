@@ -137,7 +137,6 @@ def initialize_agent():
         llm = ChatOpenAI(
             api_key=api_key,
             temperature=0.5,
-            model="gpt-4-0125-preview",
             max_tokens=150
         )
         
