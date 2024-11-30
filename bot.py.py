@@ -185,7 +185,7 @@ def initialize_agent():
         embeddings = OpenAIEmbeddings(api_key=api_key)
         
         # Load and process table data
-        loader = CSVLoader("table_data.csv")
+        loader = CSVLoader("table_data (1).csv")
         documents = loader.load()
         
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
